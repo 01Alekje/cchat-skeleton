@@ -30,26 +30,25 @@ initial_state(Nick, GUIAtom, ServerAtom) ->
 
 % Join channel
 handle(St, {join, Channel}) ->
+    io:fwrite("~p~n", ["client got join message"]),
     % TODO: Implement this function
-    Ref = make_ref(),
-    #client_st.server ! {join, {Channel, self(), Ref}},
-    receive
-        {reply, {ok, Ref}, NewState} ->
-            % Join was successful, update the client's state
-            {reply, ok, NewState#client_st{channels = [Channel | St#client_st.channels]}};
-        {reply, {error, Reason, ErrorMessage}, NewState} ->
-            % Join failed, return an error message to the GUI
-            {reply, {error, Reason, ErrorMessage}, NewState}
-    end;
+    %Ref = make_ref(),
+    %#client_st.server ! {join, {self(), Ref, Channel}},
+    
+    % gets a message from GUI
+    genserver:request(St#client_st.server, {join, Channel});
+    % add this to channels
 
 % Leave channel
 handle(St, {leave, Channel}) ->
+    io:fwrite("~p~n", ["client got leave message"]),
     % TODO: Implement this function
     % {reply, ok, St} ;
     {reply, {error, not_implemented, "leave not implemented"}, St} ;
 
 % Sending message (from GUI, to channel)
 handle(St, {message_send, Channel, Msg}) ->
+    io:fwrite("~p~n", ["client got some message"]),
     % TODO: Implement this function
     % {reply, ok, St} ;
     {reply, {error, not_implemented, "message sending not implemented"}, St} ;

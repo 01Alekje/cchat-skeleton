@@ -8,6 +8,7 @@
 %   - takes 2 params : state, request message
 %   - returns a tuple: new state, response message
 start(Atom, State, F) ->
+  io:fwrite("~p~n", ["started genserver"]),
   Pid = spawn(fun() -> loop(State, F) end),
   catch(unregister(Atom)),
   register(Atom, Pid),
