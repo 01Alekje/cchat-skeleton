@@ -50,10 +50,12 @@ request(Pid, Data, Timeout) ->
   io:fwrite("~p~n", ["request"]),
   Ref = make_ref(),
   Pid ! {request, self(), Ref, Data},
+  io:fwrite("~p~n", [Pid]),
   receive
     {result, Ref, Result} ->
       Result;
     {exit, Ref, Reason} ->
+      io:fwrite("~p~n", ["request exit"]),
       exit(Reason)
   after Timeout ->
     throw(timeout_error)

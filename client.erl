@@ -30,14 +30,21 @@ initial_state(Nick, GUIAtom, ServerAtom) ->
 
 % Join channel
 handle(St, {join, Channel}) ->
-    io:fwrite("~p~n", [pid_to_list(St#client_st.server)]),
+    io:fwrite("~p~n", [St#client_st.server]),
     
-    % gets a message from GUI
-    genserver:request(St#client_st.server, {join, Channel, self()}),
+    % Send a request to the client process (St#client_st.server) and wait for a response.
+    Response = genserver:request(St#client_st.server, {join, Channel, self()}),
 
-    receive
+    % Handle the response. 
+    case Response of
         {exit, Ref, Reason} ->
-            {exit, {error, Atom, "Error message stuff"}};
+            % Transform the exit message into the desired format.
+            ErrorAtom = my_error_atom,
+            {error, ErrorAtom, "Error message stuff"};
+        _ ->
+            % Handle other response cases here.
+            Response
+    end;
     % add this to channels
         %{reply, ok, St#client_st{channels = [Channel | St#client_st.channels]}},
 
