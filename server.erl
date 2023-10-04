@@ -28,10 +28,13 @@ start(ServerAtom) ->
 
 % {request, self(), Ref, Data} skickas kanske hit..?
 % matcha med skiten i genserver!
-handle(St, {join, Channel, Client}) ->
+% {request, self(), Ref, Data} matcha med detta
+handle(St, {join, Channel, ClientPid}) ->
     io:fwrite("~p~n", ["handle join thingy"]),
-
-    {reply, joined, St}.
+    NewChannels = [Channel | St#server_st.channels],
+    NewState = #server_st{channels = NewChannels},
+    ClientPid ! {reply, joined, self()},
+    {reply, ok, NewState}.
 
 % Stop the server process registered to the given name,
 % together with any other associated processes

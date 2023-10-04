@@ -22,7 +22,8 @@ stop(Atom) ->
 loop(State, F) ->
   receive
     {request, From, Ref, Data} ->
-      case catch(F(State, Data)) of
+      io:fwrite("~p~n", ["loop"]),
+      case catch(F(State, Data)) of % fails here, sent from request function
         {'EXIT', Reason} ->
           From!{exit, Ref, Reason},
           loop(State, F);
@@ -46,6 +47,7 @@ request(Pid, Data) ->
 % If Pid is an atom which is not registered: an "error:badarg" error is raised.
 % If timeout expires: a "timeout_error" exception is thrown.
 request(Pid, Data, Timeout) ->
+  io:fwrite("~p~n", ["request"]),
   Ref = make_ref(),
   Pid ! {request, self(), Ref, Data},
   receive
