@@ -22,8 +22,7 @@ stop(Atom) ->
 loop(State, F) ->
   receive
     {request, From, Ref, Data} ->
-      io:fwrite("~p~n", ["loop"]),
-      case catch(F(State, Data)) of % fails here, sent from request function
+      case catch(F(State, Data)) of % fails here, sent from my iphone
         {'EXIT', Reason} ->
           From!{exit, Ref, Reason},
           loop(State, F);

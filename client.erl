@@ -30,7 +30,6 @@ initial_state(Nick, GUIAtom, ServerAtom) ->
 
 % Join channel
 handle(St, {join, Channel}) ->
-    io:fwrite("~p~n", [St#client_st.server]),
     
     % Send a request to the client process (St#client_st.server) and wait for a response.
     Response = genserver:request(St#client_st.server, {join, Channel, self()}),

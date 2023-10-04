@@ -1,5 +1,5 @@
 -module(server).
--export([start/1,handle/2,stop/1]).
+-export([start/1,stop/1]).
 
 -record(server_st, {
     name,
@@ -24,10 +24,26 @@ start(ServerAtom) ->
 % {request, self(), Ref, Data} matcha med detta
 handle(St, {join, Channel, ClientPid}) ->
     io:fwrite("~p~n", ["handle join thingy"]),
-    NewChannels = [Channel | St#server_st.channels],
-    NewState = #server_st{channels = NewChannels},
-    ClientPid ! {reply, joined, self()},
-    {reply, ok, NewState}.
+    % finns kanalen
+    case lists:member(Channel, St#server_st.channels) of
+        true -> % lägg till client i genservern
+            genserver:request(list_to_atom(Channel), {join, ClientPid}),
+            {reply, joined, St};
+
+        false -> 
+            genserver:start(list_to_atom(Channel), [ClientPid], fun channelHandle/2),
+            {reply, joined, [Channel | St#server_st.channels]}
+    end.
+
+channelHandle(St, {join, Client}) ->
+    case lists:member(Client, St#server_st.clients) of
+        true ->
+            {reply, failed, St};
+        false ->
+            {reply, joined, [Client | St#server_st.clients]}
+    end.
+
+
 
 % Stop the server process registered to the given name,
 % together with any other associated processes
