@@ -19,7 +19,6 @@ handle(St, {join, Channel, ClientPid}) ->
             end;
         false -> 
             genserver:start(list_to_atom(Channel), [ClientPid], fun channelHandle/2),
-            % [ChannelServer | St#server_st.channels], % add channel process to list of channels
             {reply, joined, [Channel | St]} % add client to channel
     end;
 
@@ -51,14 +50,14 @@ handle(St, kill_Channels) ->
 channelHandle(Clients, {message_send, Channel, Nick, Msg, Sender}) -> 
     case lists:member(Sender, Clients) of
         true ->
-            lists:foreach(
+            spawn( fun() -> lists:foreach(
                 fun(Receiver) ->
-                    case Receiver == Sender of
-                        true  -> skip;
-                        false -> genserver:request(Receiver, {message_receive, Channel, Nick, Msg})
-                    end
+                        case Receiver == Sender of
+                            true  -> skip;
+                            false -> genserver:request(Receiver, {message_receive, Channel, Nick, Msg})
+                        end
                 end,
-                Clients),
+                Clients) end),
             {reply, ok, Clients};
         
         false -> {reply, failed, Clients}
