@@ -43,18 +43,23 @@ handle(St, {join, Channel}) ->
     
     catch
         throw:timeout_error -> {reply, {error, server_not_reached, "server not reached"}, St};
-        exit -> {reply, {error, server_not_reached, "server not reached"}, St}
+        error:badarg -> {reply, {error, server_not_reached, "server not reached"}, St}
     end;
 
 
 % Leave channel
 handle(St, {leave, Channel}) ->
 
-    Response = genserver:request(St#client_st.server, {leave, Channel, self()}),
+    try
+        Response = genserver:request(St#client_st.server, {leave, Channel, self()}),
 
-    case Response of
-        leaved -> {reply, ok, St#client_st{channels = lists:delete(Channel, St#client_st.channels)}};
-        failed -> {reply, {error, user_not_joined, "Client not in" ++ Channel}, St}
+        case Response of
+            leaved -> {reply, ok, St#client_st{channels = lists:delete(Channel, St#client_st.channels)}};
+            failed -> {reply, {error, user_not_joined, "Client not in" ++ Channel}, St}
+        end
+
+    catch
+        error:badarg -> {reply, ok, St}
     end;
 
     % {reply, ok, St} ;
@@ -63,18 +68,15 @@ handle(St, {leave, Channel}) ->
 % Sending message (from GUI, to channel)
 handle(St, {message_send, Channel, Msg}) ->
 
-    case lists:member(Channel, St#client_st.channels) of
-        % true means the client is in the Channel
-        
-        true -> 
-            Result = genserver:request(St#client_st.server, {message_send, Channel, St#client_st.nick, Msg, self()}),
-            case Result of
-                ok -> {reply, ok, St}
-            end;
-            
-
-        % false means the client has not joined the Channel yet
-        false -> {reply, {error, user_not_joined, "Client was not in" ++ Channel}, St}
+    try
+        Result = genserver:request(list_to_atom(Channel), {message_send, Channel, St#client_st.nick, Msg, self()}),
+        case Result of
+            ok -> {reply, ok, St};
+            failed -> {reply,  {error, user_not_joined, "user not joined"}, St}
+        end
+    catch
+        error:timeout_error -> {reply, {error, server_not_reached, "server not reached"}, St};
+        error:badarg -> {reply, {error, server_not_reached, "server not reached"}, St}
     end;
 
 % This case is only relevant for the distinction assignment!

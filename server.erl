@@ -1,16 +1,6 @@
 -module(server).
 -export([start/1,stop/1]).
 
--record(server_st, {
-    channels
-}).
-
-
-initServer() -> 
-    #server_st{
-        channels = []
-    }.
-
 % Start a new server process with the given name
 % Do not change the signature of this function.
 start(ServerAtom) ->
@@ -45,22 +35,34 @@ handle(St, {leave, Channel, ClientPid}) ->
         false -> {reply, failed, St}
     end;
 
-handle(St, {message_send, Channel, Nick, Msg, Sender}) ->
-    genserver:request(list_to_atom(Channel), {message_send, Channel, Nick, Msg, Sender}),
-    {reply, ok, St}.
+handle(St, kill_Channels) -> 
+    lists:foreach(
+        fun(Channel) -> 
+            genserver:stop(list_to_atom(Channel))
+        end,
+    St),
+    {reply, ok, []}.
+
+% handle(St, {message_send, Channel, Nick, Msg, Sender}) ->
+    % genserver:request(list_to_atom(Channel), {message_send, Channel, Nick, Msg, Sender}),
+    % {reply, ok, St}.
 
 
 channelHandle(Clients, {message_send, Channel, Nick, Msg, Sender}) -> 
-
-    lists:foreach(
-        fun(Receiver) ->
-            case Receiver == Sender of
-                true  -> skip;
-                false -> genserver:request(Receiver, {message_receive, Channel, Nick, Msg})
-            end
-        end,
-        Clients),
-    {reply, ok, Clients};
+    case lists:member(Sender, Clients) of
+        true ->
+            lists:foreach(
+                fun(Receiver) ->
+                    case Receiver == Sender of
+                        true  -> skip;
+                        false -> genserver:request(Receiver, {message_receive, Channel, Nick, Msg})
+                    end
+                end,
+                Clients),
+            {reply, ok, Clients};
+        
+        false -> {reply, failed, Clients}
+    end;
 
 channelHandle(Clients, {leave, Client}) ->
     case lists:member(Client, Clients) of
@@ -77,8 +79,8 @@ channelHandle(Clients, {join, Client}) ->
     end.
 
 
-
 % Stop the server process registered to the given name,
 % together with any other associated processes
 stop(ServerAtom) ->
+    genserver:request(ServerAtom, kill_Channels),
     genserver:stop(ServerAtom).
