@@ -30,51 +30,57 @@ initial_state(Nick, GUIAtom, ServerAtom) ->
 
 % Join channel
 handle(St, {join, Channel}) ->
-    
     try
-        % Send a request to the client process (St#client_st.server) and wait for a response.
+        % Send a request to the server to join 'Channel'
         Response = genserver:request(St#client_st.server, {join, Channel, self()}),
 
         % Handle the response. 
         case Response of
+            % joined succesfully so add the 'Channel' to our internal 'channels' list
             joined -> {reply, ok, St#client_st{channels = [Channel | St#client_st.channels]}};
+            % failed to join since client was aldready in 'Channel'
             failed -> {reply, {error, user_already_joined, "failed to join"}, St}
         end
     
     catch
+        % catch errors if the server did not respond or if no process was registerd to the serverAtom
         throw:timeout_error -> {reply, {error, server_not_reached, "server not reached"}, St};
-        error:badarg -> {reply, {error, server_not_reached, "server not reached"}, St}
+        error:badarg -> {reply, {error, server_not_reached, "server does not exist"}, St}
     end;
 
 
 % Leave channel
 handle(St, {leave, Channel}) ->
-
     try
+        % send a request to the server to leave 'Channel'
         Response = genserver:request(St#client_st.server, {leave, Channel, self()}),
 
+        % Handle the response
         case Response of
+            % leave has successfull so remove the 'Channel' from our 'channels' list
             leaved -> {reply, ok, St#client_st{channels = lists:delete(Channel, St#client_st.channels)}};
+            % leave failed since the client was not in 'Channel'
             failed -> {reply, {error, user_not_joined, "Client not in" ++ Channel}, St}
         end
-
     catch
-        error:badarg -> {reply, ok, St}
+        % Client tried to leave a channel that is removed, gets no response but can still leave
+        error:badarg -> {reply, ok, St#client_st{channels = lists:delete(Channel, St#client_st.channels)}}
     end;
-
-    % {reply, ok, St} ;
     
 
 % Sending message (from GUI, to channel)
 handle(St, {message_send, Channel, Msg}) ->
-
     try
-        Result = genserver:request(list_to_atom(Channel), {message_send, Channel, St#client_st.nick, Msg, self()}),
-        case Result of
-            ok -> {reply, ok, St};
-            failed -> {reply,  {error, user_not_joined, "user not joined"}, St}
+        % send message_send request to channel
+        Response = genserver:request(list_to_atom(Channel), {message_send, Channel, St#client_st.nick, Msg, self()}),
+        case Response of
+            ok -> 
+                % sent 'Msg' to all other clients in 'Channel'
+                {reply, ok, St};
+            failed -> % client wasn't in 'Channel'
+                {reply,  {error, user_not_joined, "user not joined"}, St}
         end
-    catch
+    catch % catch whatever errors occur, server in not alive
         error:timeout_error -> {reply, {error, server_not_reached, "server not reached"}, St};
         error:badarg -> {reply, {error, server_not_reached, "server not reached"}, St}
     end;
