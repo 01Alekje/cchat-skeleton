@@ -31,35 +31,51 @@ initial_state(Nick, GUIAtom, ServerAtom) ->
 % Join channel
 handle(St, {join, Channel}) ->
     
-    % Send a request to the client process (St#client_st.server) and wait for a response.
-    Response = genserver:request(St#client_st.server, {join, Channel, self()}),
+    try
+        % Send a request to the client process (St#client_st.server) and wait for a response.
+        Response = genserver:request(St#client_st.server, {join, Channel, self()}),
 
-    % Handle the response. 
-    case Response of
-        {exit, Ref, Reason} ->
-            % Transform the exit message into the desired format.
-            ErrorAtom = my_error_atom,
-            {error, ErrorAtom, "Error message stuff"};
-        _ ->
-            % Handle other response cases here.
-            Response
+        % Handle the response. 
+        case Response of
+            joined -> {reply, ok, St#client_st{channels = [Channel | St#client_st.channels]}};
+            failed -> {reply, {error, user_already_joined, "failed to join"}, St}
+        end
+    
+    catch
+        throw:timeout_error -> {reply, {error, server_not_reached, "server not reached"}, St};
+        exit -> {reply, {error, server_not_reached, "server not reached"}, St}
     end;
-    % add this to channels
-        %{reply, ok, St#client_st{channels = [Channel | St#client_st.channels]}},
+
 
 % Leave channel
 handle(St, {leave, Channel}) ->
-    io:fwrite("~p~n", ["client got leave message"]),
-    % TODO: Implement this function
+
+    Response = genserver:request(St#client_st.server, {leave, Channel, self()}),
+
+    case Response of
+        leaved -> {reply, ok, St#client_st{channels = lists:delete(Channel, St#client_st.channels)}};
+        failed -> {reply, {error, user_not_joined, "Client not in" ++ Channel}, St}
+    end;
+
     % {reply, ok, St} ;
-    {reply, {error, not_implemented, "leave not implemented"}, St};
+    
 
 % Sending message (from GUI, to channel)
 handle(St, {message_send, Channel, Msg}) ->
-    io:fwrite("~p~n", ["client got some message"]),
-    % TODO: Implement this function
-    % {reply, ok, St} ;
-    {reply, {error, not_implemented, "message sending not implemented"}, St} ;
+
+    case lists:member(Channel, St#client_st.channels) of
+        % true means the client is in the Channel
+        
+        true -> 
+            Result = genserver:request(St#client_st.server, {message_send, Channel, St#client_st.nick, Msg, self()}),
+            case Result of
+                ok -> {reply, ok, St}
+            end;
+            
+
+        % false means the client has not joined the Channel yet
+        false -> {reply, {error, user_not_joined, "Client was not in" ++ Channel}, St}
+    end;
 
 % This case is only relevant for the distinction assignment!
 % Change nick (no check, local only)
@@ -86,4 +102,4 @@ handle(St, quit) ->
 
 % Catch-all for any unhandled requests
 handle(St, Data) ->
-    {reply, {error, not_implemented, "Client does not handle this command"}, St} .
+    {reply, {error, not_implemented, "Client does not handle this command"}, St}.
